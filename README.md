@@ -1,3 +1,5 @@
+<p align="center"><img src="Resources/AppIcon.png" width="160" alt="ActionsBar icon"></p>
+
 # ActionsBar
 
 A lightweight macOS menu bar app that shows the live progress of your running GitHub Actions workflows.
