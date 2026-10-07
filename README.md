@@ -19,6 +19,20 @@ A lightweight macOS menu bar app that shows the live progress of your running Gi
 
 ## Install
 
+### Download (recommended)
+
+1. Download `ActionsBar-x.y.z.dmg` from the [latest release](https://github.com/cldt-fr/github-actions-bar-mac/releases/latest).
+2. Open it and drag **ActionsBar** into **Applications**.
+3. The app is not notarized by Apple, so macOS blocks the first launch. Either run:
+   ```sh
+   xattr -dr com.apple.quarantine /Applications/ActionsBar.app
+   ```
+   or open it once, then go to **System Settings → Privacy & Security** and click **Open Anyway**.
+4. Launch ActionsBar: its icon appears in the menu bar. Allow notifications when asked.
+5. If the [GitHub CLI](https://cli.github.com) is logged in (`gh auth login`), you're done. Otherwise, open the panel → ⚙︎ and paste a personal access token.
+
+### Build from source
+
 ```sh
 git clone https://github.com/cldt-fr/github-actions-bar-mac.git
 cd github-actions-bar-mac
@@ -30,6 +44,7 @@ Other commands:
 ```sh
 make run       # build the .app into build/ and open it
 make build     # debug build (swift build)
+make package   # builds build/ActionsBar-<version>.dmg and .zip
 swift run      # quick run without an app bundle (no notifications)
 ```
 

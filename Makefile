@@ -1,4 +1,4 @@
-.PHONY: build app run install clean
+.PHONY: build app run install package clean
 
 build:
 	swift build
@@ -14,6 +14,9 @@ install: app
 	rm -rf /Applications/ActionsBar.app
 	cp -R build/ActionsBar.app /Applications/
 	open /Applications/ActionsBar.app
+
+package:
+	./scripts/package.sh
 
 clean:
 	rm -rf .build build
