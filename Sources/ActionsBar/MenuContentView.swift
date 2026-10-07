@@ -18,6 +18,8 @@ struct MenuContentView: View {
             footer
         }
         .frame(width: 380)
+        // Opaque background: the default popover material is too see-through on recent macOS.
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var header: some View {

@@ -52,6 +52,8 @@ struct SettingsView: View {
                     TextEditor(text: $pinnedText)
                         .font(.system(.caption, design: .monospaced))
                         .frame(height: 70)
+                        .scrollContentBackground(.hidden)
+                        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 4))
                         .overlay(RoundedRectangle(cornerRadius: 4).stroke(.quaternary))
                 }
 
@@ -85,6 +87,7 @@ struct SettingsView: View {
             .padding(12)
         }
         .frame(maxHeight: 520)
+        .fixedSize(horizontal: false, vertical: true)
         .onAppear {
             pinnedText = settings.pinnedRepos.joined(separator: "\n")
             launchAtLogin = settings.launchAtLogin

@@ -1,5 +1,4 @@
-import AppKit
-import ServiceManagement
+import Foundation
 import UserNotifications
 
 enum Notifier {
@@ -24,46 +23,5 @@ enum Notifier {
 
         let request = UNNotificationRequest(identifier: "run-\(run.id)-\(run.runAttempt ?? 1)", content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
-    }
-}
-
-final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        // Also hides the Dock icon when launched with `swift run` (no Info.plist).
-        NSApp.setActivationPolicy(.accessory)
-        if Notifier.isAvailable {
-            UNUserNotificationCenter.current().delegate = self
-            Notifier.requestAuthorization()
-            enableLaunchAtLoginOnFirstRun()
-        }
-    }
-
-    /// Launch at login is on by default, but only set once so that turning it off in the settings sticks.
-    private func enableLaunchAtLoginOnFirstRun() {
-        let key = "didConfigureLaunchAtLogin"
-        guard !UserDefaults.standard.bool(forKey: key) else { return }
-        do {
-            try SMAppService.mainApp.register()
-            UserDefaults.standard.set(true, forKey: key)
-        } catch {
-            NSLog("ActionsBar: launch at login failed: \(error)")
-        }
-    }
-
-    nonisolated func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification
-    ) async -> UNNotificationPresentationOptions {
-        [.banner, .sound]
-    }
-
-    nonisolated func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse
-    ) async {
-        guard let string = response.notification.request.content.userInfo["url"] as? String,
-              let url = URL(string: string)
-        else { return }
-        await MainActor.run { _ = NSWorkspace.shared.open(url) }
     }
 }

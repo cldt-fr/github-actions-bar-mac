@@ -1,47 +1,137 @@
 import AppKit
+import ServiceManagement
 import SwiftUI
+import UserNotifications
 
 @main
 struct ActionsBarApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @State private var store = RunStore(settings: AppSettings())
 
     var body: some Scene {
-        MenuBarExtra {
-            MenuContentView()
-                .environment(store)
-        } label: {
-            StatusBarLabel(store: store)
-        }
-        .menuBarExtraStyle(.window)
+        // The UI lives in an NSStatusItem + NSPopover (see StatusItemController):
+        // MenuBarExtra windows drift away from the menu bar when their content resizes.
+        Settings { EmptyView() }
     }
 }
 
-/// What is shown in the menu bar itself.
-struct StatusBarLabel: View {
-    let store: RunStore
+final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+    private var store: RunStore?
+    private var statusItemController: StatusItemController?
 
-    var body: some View {
-        if let first = store.active.first {
-            HStack(spacing: 4) {
-                Image(nsImage: ProgressRing.image(progress: store.overallProgress))
-                Text(text(first: first))
-                    .monospacedDigit()
-            }
-        } else {
-            Image(systemName: idleSymbol)
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Also hides the Dock icon when launched with `swift run` (no Info.plist).
+        NSApp.setActivationPolicy(.accessory)
+
+        let store = RunStore(settings: AppSettings())
+        self.store = store
+        statusItemController = StatusItemController(store: store)
+
+        if Notifier.isAvailable {
+            UNUserNotificationCenter.current().delegate = self
+            Notifier.requestAuthorization()
+            enableLaunchAtLoginOnFirstRun()
         }
     }
 
-    private func text(first: ActiveRun) -> String {
-        let percent = "\(Int((store.overallProgress * 100).rounded()))%"
+    /// Launch at login is on by default, but only set once so that turning it off in the settings sticks.
+    private func enableLaunchAtLoginOnFirstRun() {
+        let key = "didConfigureLaunchAtLogin"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        do {
+            try SMAppService.mainApp.register()
+            UserDefaults.standard.set(true, forKey: key)
+        } catch {
+            NSLog("ActionsBar: launch at login failed: \(error)")
+        }
+    }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .sound]
+    }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        guard let string = response.notification.request.content.userInfo["url"] as? String,
+              let url = URL(string: string)
+        else { return }
+        await MainActor.run { _ = NSWorkspace.shared.open(url) }
+    }
+}
+
+/// Owns the menu bar item and the popover anchored to it.
+@MainActor
+final class StatusItemController: NSObject {
+    private let store: RunStore
+    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    private let popover = NSPopover()
+
+    init(store: RunStore) {
+        self.store = store
+        super.init()
+
+        let hostingController = NSHostingController(rootView: MenuContentView().environment(store))
+        // Let the popover follow the SwiftUI content size; it stays anchored to the status item.
+        hostingController.sizingOptions = [.preferredContentSize]
+        popover.contentViewController = hostingController
+        popover.behavior = .transient
+
+        if let button = statusItem.button {
+            button.target = self
+            button.action = #selector(togglePopover)
+            button.imagePosition = .imageLeading
+        }
+        observeStore()
+    }
+
+    @objc private func togglePopover() {
+        guard let button = statusItem.button else { return }
+        if popover.isShown {
+            popover.performClose(nil)
+        } else {
+            NSApp.activate(ignoringOtherApps: true)
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            popover.contentViewController?.view.window?.makeKey()
+        }
+    }
+
+    /// Re-renders the status item whenever the store properties it reads change.
+    private func observeStore() {
+        withObservationTracking {
+            updateButton()
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observeStore() }
+        }
+    }
+
+    private func updateButton() {
+        guard let button = statusItem.button else { return }
+
+        guard let first = store.active.first else {
+            button.image = NSImage(systemSymbolName: idleSymbol, accessibilityDescription: "ActionsBar")
+            button.image?.isTemplate = true
+            button.title = ""
+            return
+        }
+
+        let progress = store.overallProgress
+        let percent = "\(Int((progress * 100).rounded()))%"
+        let text: String
         if store.active.count > 1 {
-            return "\(store.active.count) · \(percent)"
+            text = "\(store.active.count) · \(percent)"
+        } else if store.settings.showNameInMenuBar {
+            text = "\(first.run.workflowName) \(percent)"
+        } else {
+            text = percent
         }
-        if store.settings.showNameInMenuBar {
-            return "\(first.run.workflowName) \(percent)"
-        }
-        return percent
+
+        button.image = ProgressRing.image(progress: progress)
+        let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.menuBarFont(ofSize: 0).pointSize, weight: .regular)
+        button.attributedTitle = NSAttributedString(string: " " + text, attributes: [.font: font])
     }
 
     private var idleSymbol: String {
