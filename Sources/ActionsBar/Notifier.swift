@@ -1,4 +1,5 @@
 import AppKit
+import ServiceManagement
 import UserNotifications
 
 enum Notifier {
@@ -33,6 +34,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if Notifier.isAvailable {
             UNUserNotificationCenter.current().delegate = self
             Notifier.requestAuthorization()
+            enableLaunchAtLoginOnFirstRun()
+        }
+    }
+
+    /// Launch at login is on by default, but only set once so that turning it off in the settings sticks.
+    private func enableLaunchAtLoginOnFirstRun() {
+        let key = "didConfigureLaunchAtLogin"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        do {
+            try SMAppService.mainApp.register()
+            UserDefaults.standard.set(true, forKey: key)
+        } catch {
+            NSLog("ActionsBar: launch at login failed: \(error)")
         }
     }
 
