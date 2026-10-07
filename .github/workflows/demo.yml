@@ -1,0 +1,38 @@
+# Workflow factice pour tester ActionsBar : plusieurs jobs et étapes qui durent ~2-3 min.
+name: Demo ActionsBar
+
+on:
+  workflow_dispatch:
+    inputs:
+      fail:
+        description: "Faire échouer le dernier job (pour tester la notification d'échec)"
+        type: boolean
+        default: false
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - run: sleep 15
+      - run: sleep 15
+      - run: sleep 15
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [1, 2]
+    steps:
+      - run: sleep 20
+      - run: sleep 20
+      - run: sleep 20
+      - run: sleep 20
+
+  deploy:
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - run: sleep 20
+      - run: sleep 20
+      - name: Résultat
+        run: exit ${{ inputs.fail && 1 || 0 }}
